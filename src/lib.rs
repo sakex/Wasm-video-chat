@@ -22,7 +22,7 @@ impl RecordHandle {
     }
 }
 
-fn start_listener_callback(stream: MediaStream) -> Closure<dyn FnMut(JsValue)> {
+fn start_listener(stream: MediaStream) -> RecordHandle {
     let context: AudioContext = AudioContext::new().unwrap();
     let source: MediaStreamAudioSourceNode = context.create_media_stream_source(&stream).unwrap();
     let processor: ScriptProcessorNode = context.create_script_processor().unwrap();
@@ -31,26 +31,23 @@ fn start_listener_callback(stream: MediaStream) -> Closure<dyn FnMut(JsValue)> {
     processor.connect_with_audio_node(&context.destination());
 
     let listener = Closure::wrap(Box::new(|js_stream: JsValue| {
-        log("hi");
+        log("1");
     }) as Box<dyn FnMut(JsValue)>);
 
     processor.set_onaudioprocess(listener.as_ref().dyn_ref());
 
-    listener
+    RecordHandle::new(listener)
 }
 
 #[wasm_bindgen]
-pub fn load_mic() -> RecordHandle {
+pub async fn load_mic() -> RecordHandle {
     let devices = web_sys::window().unwrap().navigator().media_devices().unwrap();
     let mut constraints = MediaStreamConstraints::new();
     constraints.audio(&JsValue::TRUE);
     let promise = devices.get_user_media_with_constraints(&constraints).unwrap();
 
-    let cb = Closure::wrap(Box::new(|js_stream: JsValue| {
-        let stream: MediaStream = js_stream.unchecked_into();
-        start_listener(stream, &listener);
-    }) as Box<dyn FnMut(JsValue)>);
+    let js_stream: JsValue = wasm_bindgen_futures::JsFuture::from(promise).await.unwrap();
 
-    promise.then(&cb);
-    RecordHandle::new(cb)
+    let stream: MediaStream = js_stream.unchecked_into();
+    start_listener(stream)
 }
