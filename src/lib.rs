@@ -1,8 +1,10 @@
 extern crate wasm_bindgen;
+
 use wasm_bindgen::prelude::*;
 
 mod audio;
 mod js_extend;
+
 use js_extend::js_extension;
 use audio::audio_stream::Microphone;
 use js_extension::log;
