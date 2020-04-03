@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 use web_sys::*;
 use wasm_bindgen::JsCast;
-use crate::js_extend::js_extension;
+use crate::js_extend;
 
 type Callback = fn(JsValue);
 
@@ -14,7 +14,7 @@ impl Microphone {
         Microphone{callback}
     }
 
-    pub async fn start_listening(&self) -> js_extension::RegisterCallback {
+    pub async fn start_listening(&self) -> js_extend::RegisterCallback {
         let devices = web_sys::window().unwrap().navigator().media_devices().unwrap();
         let mut constraints = MediaStreamConstraints::new();
         constraints.audio(&JsValue::TRUE);
@@ -26,7 +26,7 @@ impl Microphone {
         self.start_listener(stream)
     }
 
-    fn start_listener(&self, stream: MediaStream) -> js_extension::RegisterCallback {
+    fn start_listener(&self, stream: MediaStream) -> js_extend::RegisterCallback {
         let context: AudioContext = AudioContext::new().unwrap();
         let source: MediaStreamAudioSourceNode = context.create_media_stream_source(&stream).unwrap();
         let processor: ScriptProcessorNode = context.create_script_processor_with_buffer_size(1024).unwrap();
@@ -38,6 +38,6 @@ impl Microphone {
 
         processor.set_onaudioprocess(listener.as_ref().dyn_ref());
 
-        js_extension::RegisterCallback::new(listener)
+        js_extend::RegisterCallback::new(listener)
     }
 }

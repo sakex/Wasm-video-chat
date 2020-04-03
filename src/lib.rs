@@ -1,20 +1,20 @@
 extern crate wasm_bindgen;
 
 use wasm_bindgen::prelude::*;
+use web_sys::console;
 
 mod audio;
 mod js_extend;
 
-use js_extend::js_extension;
 use audio::audio_stream::Microphone;
-use js_extension::log;
+use js_extend::Gettable;
 
 fn cb(obj: JsValue) {
-    log("test");
+    console::log_1(&obj.get("inputBuffer"));
 }
 
 #[wasm_bindgen]
-pub async fn load_mic() -> js_extension::RegisterCallback {
+pub async fn load_mic() -> js_extend::RegisterCallback {
     let mic = Microphone::new(cb);
     mic.start_listening().await
 }
