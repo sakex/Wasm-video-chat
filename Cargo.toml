@@ -20,15 +20,16 @@ wasm-bindgen-futures = "0.4.10"
 [dependencies.web-sys]
 version = "0.3.4"
 features = [
-  'Element',
-  'Window',
-  'console',
-  'Navigator',
-  'MediaDevices',
   'AudioContext',
   'AudioDestinationNode',
+  'console',
+  'Element',
+  'Navigator',
+  'MediaDevices',
+  'MediaStreamAudioSourceNode',
   'MediaStreamConstraints',
   'MediaStream',
+  'RtcPeerConnection',
   'ScriptProcessorNode',
-  'MediaStreamAudioSourceNode'
+  'Window'
 ]
