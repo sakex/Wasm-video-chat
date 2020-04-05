@@ -108,6 +108,10 @@ impl Streaming {
         peer2.set_ontrack(on_track.as_ref().dyn_ref());
 
         let p = future_to_promise(async move {
+            /*stream.get_tracks().iter().for_each(|track: JsValue| {
+                peer1.add_track_0(&track.unchecked_into(), &stream);
+            });*/
+
             let set_remote_promise = peer1.as_ref().set_remote_description(&offer);
             js_await![set_remote_promise];
 
@@ -146,6 +150,8 @@ impl Streaming {
 
         let peer1 = Arc::clone(&self.peer1);
         let peer2 = Arc::clone(&self.peer2);
+
+        let on_track = self.track_cb();
 
         let cb1 = Streaming::ice_candidate_cb(p2);
         let cb2 = Streaming::ice_candidate_cb(p1);
