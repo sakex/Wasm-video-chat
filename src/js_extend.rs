@@ -1,23 +1,37 @@
 use wasm_bindgen::prelude::*;
 
-pub trait Gettable {
-    fn get(&self, value: &str) -> JsValue;
+#[macro_export]
+macro_rules! get {
+    ($obj: ident => $key: expr) => (js_sys::Reflect::get(&$obj, &JsValue::from_str($key)).unwrap())
 }
 
-impl Gettable for JsValue {
-    fn get(&self, value: &str) -> JsValue {
-        js_sys::Reflect::get(&self, &JsValue::from_str(value)).unwrap()
-    }
+#[macro_export]
+macro_rules! js_await {
+    ($promise: ident) => (wasm_bindgen_futures::JsFuture::from($promise).await.unwrap());
+    ($promise: expr) => (wasm_bindgen_futures::JsFuture::from($promise).await.unwrap())
 }
+
 
 #[wasm_bindgen]
 pub struct RegisterCallback {
-    cb: Closure<dyn FnMut(JsValue)>
+    callbacks: Vec<Closure<dyn FnMut(JsValue)>>,
+    promise: js_sys::Promise,
+}
+
+#[wasm_bindgen]
+impl RegisterCallback {
+    pub fn get_promise(&self) -> js_sys::Promise {
+        self.promise.clone()
+    }
 }
 
 impl RegisterCallback {
-    pub fn new(cb: Closure<dyn FnMut(JsValue)>) -> RegisterCallback {
-        RegisterCallback { cb }
+    pub fn new(promise: js_sys::Promise) -> RegisterCallback {
+        RegisterCallback { callbacks: vec![], promise }
+    }
+
+    pub fn add_cb(&mut self, cb: Closure<dyn FnMut(JsValue)>) {
+        self.callbacks.push(cb);
     }
 }
 
