@@ -13,21 +13,21 @@ macro_rules! js_await {
 
 
 #[wasm_bindgen]
-pub struct RegisterCallback {
+pub struct ConnectionOffer {
     callbacks: Vec<Closure<dyn FnMut(JsValue)>>,
     promise: js_sys::Promise,
 }
 
 #[wasm_bindgen]
-impl RegisterCallback {
-    pub fn get_promise(&self) -> js_sys::Promise {
+impl ConnectionOffer {
+    pub fn get_offer(&self) -> js_sys::Promise {
         self.promise.clone()
     }
 }
 
-impl RegisterCallback {
-    pub fn new(promise: js_sys::Promise) -> RegisterCallback {
-        RegisterCallback { callbacks: vec![], promise }
+impl ConnectionOffer {
+    pub fn new(promise: js_sys::Promise) -> ConnectionOffer {
+        ConnectionOffer { callbacks: vec![], promise }
     }
 
     pub fn add_cb(&mut self, cb: Closure<dyn FnMut(JsValue)>) {
