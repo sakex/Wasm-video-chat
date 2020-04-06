@@ -19,11 +19,11 @@ pub struct Streaming {
 
 #[wasm_bindgen]
 impl Streaming {
-    fn create_muted_video() -> web_sys::HtmlVideoElement {
+    fn create_muted_video(muted: bool) -> web_sys::HtmlVideoElement {
         let document = web_sys::window().unwrap().document().unwrap();
         let video = document.create_element("video").unwrap().unchecked_into::<web_sys::HtmlVideoElement>();
         video.set_autoplay(true);
-        video.set_muted(true);
+        video.set_muted(muted);
         video.set_width(300);
         video.set_height(300);
         video
@@ -31,15 +31,15 @@ impl Streaming {
 
     #[wasm_bindgen(constructor)]
     pub fn new(dom_element: web_sys::Element) -> Streaming {
-        let video1 = Streaming::create_muted_video();
-        let video2 = Streaming::create_muted_video();
+        let video1 = Streaming::create_muted_video(true);
+        let video2 = Streaming::create_muted_video(false);
         /*{ urls: 'stun:stun1.l.google.com:19302' }*/
         let mut config = RtcConfiguration::new();
-        let mut obj = js_sys::Object::new();
-        let mut arr = js_sys::Array::new();
+        let obj = js_sys::Object::new();
+        let arr = js_sys::Array::new();
         arr.push(&"stun:stun1.l.google.com:19302".into());
         set![obj => "urls", arr];
-        let mut ice_server_arr = js_sys::Array::new();
+        let ice_server_arr = js_sys::Array::new();
         ice_server_arr.push(&obj);
         config.ice_servers(&ice_server_arr);
         let peer: Arc<RtcPeerConnection> = Arc::new(RtcPeerConnection::new_with_configuration(&config).unwrap());
@@ -48,7 +48,7 @@ impl Streaming {
             video1: Rc::new(video1),
             video2: Rc::new(video2),
             peer,
-            on_ice_candidate: js_sys::Function::new_no_args("")
+            on_ice_candidate: js_sys::Function::new_no_args(""),
         }
     }
 
@@ -57,7 +57,7 @@ impl Streaming {
     }
 
     pub fn add_ice_candidate(&mut self, candidate: RtcIceCandidate) {
-        self.peer.as_ref().add_ice_candidate_with_opt_rtc_ice_candidate(Some(&candidate));
+        let _ = self.peer.as_ref().add_ice_candidate_with_opt_rtc_ice_candidate(Some(&candidate));
     }
 
     pub fn load_video(&self) -> js_sys::Promise {
@@ -84,15 +84,14 @@ impl Streaming {
     }
 
     fn ice_candidate_cb(&self) -> Closure<dyn FnMut(JsValue)> {
-        let peer = self.peer.clone();
         let cb = self.on_ice_candidate.clone();
         Closure::wrap(Box::new(move |event: JsValue| {
             match get![event => "candidate"].dyn_into::<RtcIceCandidate>() {
                 Ok(candidate) => {
-                    cb.call1(&JsValue::NULL, &candidate);
-                    // let _ = peer.as_ref().add_ice_candidate_with_opt_rtc_ice_candidate(Some(&candidate));
+                    console::log_2(&"test".into(), &candidate);
+                    cb.call1(&JsValue::NULL, &candidate).unwrap();
                 }
-                Err(e) => console::log_1(&e),
+                Err(_e) => {}
             };
         }) as Box<dyn FnMut(JsValue)>)
     }
@@ -101,8 +100,14 @@ impl Streaming {
         let video2 = Rc::clone(&self.video2);
         Closure::wrap(Box::new(move |event: JsValue| {
             let video: &HtmlVideoElement = video2.as_ref();
+            console::log_1(&JsValue::TRUE);
             match video2.src_object() {
-                Some(_video) => {}
+                Some(_video) => {
+                    let streams: js_sys::Array = get![event => "streams"].unchecked_into();
+                    let js_stream: JsValue = streams.get(0);
+                    let stream: MediaStream = js_stream.unchecked_into();
+                    video.set_src_object(Some(&stream));
+                }
                 None => {
                     let streams: js_sys::Array = get![event => "streams"].unchecked_into();
                     let js_stream: JsValue = streams.get(0);
@@ -147,8 +152,6 @@ impl Streaming {
         let p = future_to_promise(async move {
             let set_remote_promise = peer.as_ref().set_remote_description(&answer);
             js_await![set_remote_promise];
-            /*let set_local_promise = peer2.as_ref().set_local_description(&answer);
-            js_await![set_local_promise];*/
             Ok(JsValue::TRUE)
         });
 
