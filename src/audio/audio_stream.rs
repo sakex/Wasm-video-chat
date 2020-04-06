@@ -40,16 +40,12 @@ impl Streaming {
         let mut config = RtcConfiguration::new();
         let obj = js_sys::Object::new();
         let arr = js_sys::Array::new();
-        set![obj => "urls", "stun:senges.ch:3478"];
-        /*let obj2 = js_sys::Object::new();
-        set![obj2 => "urls", "turn:senges.ch:3478"];
-        arr.push(&obj2);*/
-
+        set![obj => "url", "stun:stun.l.google.com:19302"];
         arr.push(&obj);
         console::log_1(&arr);
         config.ice_servers(&arr);
-        //let peer: Arc<RtcPeerConnection> = Arc::new(RtcPeerConnection::new_with_configuration(&config).unwrap());
-        let peer: Arc<RtcPeerConnection> = Arc::new(RtcPeerConnection::new().unwrap());
+        let peer: Arc<RtcPeerConnection> = Arc::new(RtcPeerConnection::new_with_configuration(&config).unwrap());
+        //let peer: Arc<RtcPeerConnection> = Arc::new(RtcPeerConnection::new().unwrap());
 
         Streaming {
             dom_element,
@@ -96,7 +92,9 @@ impl Streaming {
         Closure::wrap(Box::new(move |event: JsValue| {
             match get![event => "candidate"].dyn_into::<RtcIceCandidate>() {
                 Ok(candidate) => {
-                    cb.call1(&JsValue::NULL, &candidate).unwrap();
+                    if &get![candidate => "protocol"].as_string().unwrap() == "udp" {
+                        cb.call1(&JsValue::NULL, &candidate).unwrap();
+                    }
                 }
                 Err(_e) => {}
             };
@@ -108,9 +106,9 @@ impl Streaming {
         Closure::wrap(Box::new(move |event: JsValue| {
             let video: &HtmlVideoElement = video2.as_ref();
             match video2.src_object() {
-                Some(_video) => {
-                }
+                Some(_video) => {}
                 None => {
+                    log("t");
                     let streams: js_sys::Array = get![event => "streams"].unchecked_into();
                     let js_stream: JsValue = streams.get(0);
                     let stream: MediaStream = js_stream.unchecked_into();
