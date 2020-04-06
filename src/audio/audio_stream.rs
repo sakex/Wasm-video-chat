@@ -108,9 +108,9 @@ impl Streaming {
             match video2.src_object() {
                 Some(_video) => {}
                 None => {
-                    log("t");
                     let streams: js_sys::Array = get![event => "streams"].unchecked_into();
                     let js_stream: JsValue = streams.get(0);
+                    console::log_1(&js_stream);
                     let stream: MediaStream = js_stream.unchecked_into();
                     video.set_src_object(Some(&stream));
                 }
