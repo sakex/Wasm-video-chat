@@ -6,6 +6,11 @@ macro_rules! get {
 }
 
 #[macro_export]
+macro_rules! set {
+    ($obj: ident => $key: expr, $val: expr) => (js_sys::Reflect::set(&$obj, &$key.into(), &$val.into()).unwrap())
+}
+
+#[macro_export]
 macro_rules! js_await {
     ($promise: ident) => (wasm_bindgen_futures::JsFuture::from($promise).await.unwrap());
     ($promise: expr) => (wasm_bindgen_futures::JsFuture::from($promise).await.unwrap())

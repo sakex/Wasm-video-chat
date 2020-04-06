@@ -38,6 +38,7 @@ features = [
   'MediaStreamAudioSourceNode',
   'MediaStreamConstraints',
   'MediaStreamTrack',
+  'RtcConfiguration',
   'RtcIceCandidate',
   'RtcIceCandidateInit',
   'RtcOfferOptions',
