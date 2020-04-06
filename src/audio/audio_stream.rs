@@ -33,16 +33,20 @@ impl Streaming {
     pub fn new(dom_element: web_sys::Element) -> Streaming {
         let video1 = Streaming::create_muted_video(true);
         let video2 = Streaming::create_muted_video(false);
-        /*{ urls: 'stun:stun1.l.google.com:19302' }*/
         let mut config = RtcConfiguration::new();
         let obj = js_sys::Object::new();
         let arr = js_sys::Array::new();
-        arr.push(&"stun:stun1.l.google.com:19302".into());
-        set![obj => "urls", arr];
-        let ice_server_arr = js_sys::Array::new();
-        ice_server_arr.push(&obj);
-        config.ice_servers(&ice_server_arr);
-        let peer: Arc<RtcPeerConnection> = Arc::new(RtcPeerConnection::new_with_configuration(&config).unwrap());
+        set![obj => "urls", "stun:senges.ch:3478"];
+        /*let obj2 = js_sys::Object::new();
+        set![obj2 => "urls", "turn:senges.ch:3478"];
+        arr.push(&obj2);*/
+
+        arr.push(&obj);
+        console::log_1(&arr);
+        config.ice_servers(&arr);
+        //let peer: Arc<RtcPeerConnection> = Arc::new(RtcPeerConnection::new_with_configuration(&config).unwrap());
+        let peer: Arc<RtcPeerConnection> = Arc::new(RtcPeerConnection::new().unwrap());
+
         Streaming {
             dom_element,
             video1: Rc::new(video1),
