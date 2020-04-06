@@ -1,8 +1,6 @@
 extern crate wasm_bindgen;
 extern crate console_error_panic_hook;
 
-use std::panic;
-
 
 mod audio;
 

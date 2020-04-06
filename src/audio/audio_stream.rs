@@ -29,6 +29,10 @@ impl Streaming {
         video
     }
 
+    pub fn get_peer(&self) -> JsValue {
+        self.peer.as_ref().clone().unchecked_into()
+    }
+
     #[wasm_bindgen(constructor)]
     pub fn new(dom_element: web_sys::Element) -> Streaming {
         let video1 = Streaming::create_muted_video(true);
@@ -61,7 +65,7 @@ impl Streaming {
     }
 
     pub fn add_ice_candidate(&mut self, candidate: RtcIceCandidate) {
-        let _ = self.peer.as_ref().add_ice_candidate_with_opt_rtc_ice_candidate(Some(&candidate));
+        let _ = self.peer.as_ref().add_ice_candidate_with_opt_rtc_ice_candidate(Option::from(&candidate));
     }
 
     pub fn load_video(&self) -> js_sys::Promise {
@@ -92,7 +96,6 @@ impl Streaming {
         Closure::wrap(Box::new(move |event: JsValue| {
             match get![event => "candidate"].dyn_into::<RtcIceCandidate>() {
                 Ok(candidate) => {
-                    console::log_2(&"test".into(), &candidate);
                     cb.call1(&JsValue::NULL, &candidate).unwrap();
                 }
                 Err(_e) => {}
@@ -103,8 +106,8 @@ impl Streaming {
     fn track_cb(&self) -> Closure<dyn FnMut(JsValue)> {
         let video2 = Rc::clone(&self.video2);
         Closure::wrap(Box::new(move |event: JsValue| {
+            log("In track");
             let video: &HtmlVideoElement = video2.as_ref();
-            console::log_1(&JsValue::TRUE);
             match video2.src_object() {
                 Some(_video) => {
                     let streams: js_sys::Array = get![event => "streams"].unchecked_into();
