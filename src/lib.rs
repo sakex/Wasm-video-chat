@@ -1,6 +1,9 @@
 extern crate wasm_bindgen;
 extern crate console_error_panic_hook;
 
+#[macro_use]
+extern crate serde_derive;
+
 
 mod audio;
 

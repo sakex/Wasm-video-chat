@@ -4,8 +4,21 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::future_to_promise;
 use std::rc::Rc;
 use crate::js_extend::{log, ConnectionOffer};
-use crate::{get, set, js_await};
+use crate::{get, js_await};
 use std::sync::Arc;
+
+
+#[derive(Serialize)]
+pub struct StunServer {
+    url: String,
+}
+
+#[derive(Serialize)]
+pub struct TurnServer {
+    url: &'static str,
+    credential: &'static str,
+    username: &'static str,
+}
 
 
 #[wasm_bindgen]
@@ -38,10 +51,23 @@ impl Streaming {
         let video1 = Streaming::create_muted_video(true);
         let video2 = Streaming::create_muted_video(false);
         let mut config = RtcConfiguration::new();
-        let obj = js_sys::Object::new();
         let arr = js_sys::Array::new();
-        set![obj => "url", "stun:stun.l.google.com:19302"];
-        arr.push(&obj);
+        let obj = StunServer {
+            url: "stun:stun.l.google.com:19302".to_string()
+        };
+        let obj2 = TurnServer {
+            url: "turn:numb.viagenie.ca",
+            credential: "muazkh",
+            username: "webrtc@live.com",
+        };
+        let obj3 = TurnServer {
+            url: "turn:192.158.29.39:3478?transport=udp",
+            credential: "JZEOEt2V3Qb0y27GRntt2u2PAYA=",
+            username: "28224511:1379330808",
+        };
+        arr.push(&JsValue::from_serde(&obj).unwrap());
+        arr.push(&JsValue::from_serde(&obj2).unwrap());
+        arr.push(&JsValue::from_serde(&obj3).unwrap());
         console::log_1(&arr);
         config.ice_servers(&arr);
         let peer: Arc<RtcPeerConnection> = Arc::new(RtcPeerConnection::new_with_configuration(&config).unwrap());
