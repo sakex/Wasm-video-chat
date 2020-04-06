@@ -106,14 +106,9 @@ impl Streaming {
     fn track_cb(&self) -> Closure<dyn FnMut(JsValue)> {
         let video2 = Rc::clone(&self.video2);
         Closure::wrap(Box::new(move |event: JsValue| {
-            log("In track");
             let video: &HtmlVideoElement = video2.as_ref();
             match video2.src_object() {
                 Some(_video) => {
-                    let streams: js_sys::Array = get![event => "streams"].unchecked_into();
-                    let js_stream: JsValue = streams.get(0);
-                    let stream: MediaStream = js_stream.unchecked_into();
-                    video.set_src_object(Some(&stream));
                 }
                 None => {
                     let streams: js_sys::Array = get![event => "streams"].unchecked_into();
