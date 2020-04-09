@@ -266,7 +266,8 @@ impl Streaming {
         constraints.audio(&JsValue::TRUE);
         let video_constraints = VideoConstraints { width: 300, height: 300, frame_rate: 10 };
         constraints.video(&JsValue::from_serde(&video_constraints).unwrap());
-        let promise = devices.get_user_media_with_constraints(&constraints).unwrap();
+        //let promise = devices.get_user_media_with_constraints(&constraints).unwrap();
+        let promise = devices.get_user_media().unwrap();
         let video = Rc::clone(&self.self_video);
         self.dom_element.append_child(&video).unwrap();
 
