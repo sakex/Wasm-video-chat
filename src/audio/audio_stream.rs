@@ -286,9 +286,21 @@ impl Streaming {
         })
     }
 
-    pub fn create_connection(&mut self, id: String) {
-        let co = Connection::new();
-        self.dom_element.append_child(&co.video).unwrap();
-        self.connections.insert(id, co);
+    pub fn create_connection(&mut self, id: String) -> Result<JsValue, JsValue> {
+        if !self.connections.contains_key(&id) {
+            let co = Connection::new();
+            self.dom_element.append_child(&co.video).unwrap();
+            self.connections.insert(id, co);
+            return Ok(JsValue::TRUE)
+        }
+        Err(JsValue::FALSE)
+    }
+
+    pub fn get_ids(&self) -> js_sys::Array {
+        let arr: js_sys::Array = js_sys::Array::new();
+        for key in self.connections.keys() {
+            arr.push(&JsValue::from_str(key));
+        }
+        arr
     }
 }
