@@ -12,8 +12,8 @@ macro_rules! set {
 
 #[macro_export]
 macro_rules! js_await {
-    ($promise: ident) => (wasm_bindgen_futures::JsFuture::from($promise).await.unwrap());
-    ($promise: expr) => (wasm_bindgen_futures::JsFuture::from($promise).await.unwrap())
+    ($promise: ident) => (wasm_bindgen_futures::JsFuture::from($promise).await);
+    ($promise: expr) => (wasm_bindgen_futures::JsFuture::from($promise).await)
 }
 
 
@@ -38,10 +38,4 @@ impl ConnectionOffer {
     pub fn add_cb(&mut self, cb: Closure<dyn FnMut(JsValue)>) {
         self.callbacks.push(cb);
     }
-}
-
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    pub fn log(s: &str);
 }

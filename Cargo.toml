@@ -29,6 +29,7 @@ features = [
   'AudioTrack',
   'AudioTrackList',
   'console',
+  'CssStyleDeclaration',
   'Document',
   'Element',
   'HtmlElement',
