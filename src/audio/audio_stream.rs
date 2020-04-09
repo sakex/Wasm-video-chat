@@ -293,14 +293,14 @@ impl Streaming {
             self.connections.insert(id, co);
             return Ok(JsValue::TRUE)
         }
-        Err(JsValue::FALSE)
+        Err(JsValue::from_str("Id already created"))
     }
 
-    pub fn get_ids(&self) -> js_sys::Array {
-        let arr: js_sys::Array = js_sys::Array::new();
+    pub fn get_ids(&self) -> js_sys::Set {
+        let set: js_sys::Set = js_sys::Set::new(&JsValue::UNDEFINED);
         for key in self.connections.keys() {
-            arr.push(&JsValue::from_str(key));
+            set.add(&JsValue::from_str(key));
         }
-        arr
+        set
     }
 }
