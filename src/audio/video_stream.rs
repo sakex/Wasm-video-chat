@@ -18,12 +18,12 @@ pub struct VideoConstraints {
 
 #[derive(Serialize)]
 pub struct StunServer {
-    url: String,
+    urls: Vec<&'static str>,
 }
 
 #[derive(Serialize)]
 pub struct TurnServer {
-    url: &'static str,
+    urls: Vec<&'static str>,
     credential: &'static str,
     username: &'static str,
 }
@@ -53,10 +53,10 @@ impl Connection {
         let mut config = RtcConfiguration::new();
         let arr = js_sys::Array::new();
         let stun = StunServer {
-            url: "stun:stun.l.google.com:19302".to_string()
+            urls: vec!["stun:stun.l.google.com:19302"]
         };
         let turn = TurnServer {
-            url: "turn:numb.viagenie.ca",
+            urls: vec!["turn:numb.viagenie.ca"],
             credential: "muazkh",
             username: "webrtc@live.com",
         };
