@@ -90,7 +90,7 @@ impl Connection {
         let on_state_change = Connection::state_change_cb(video.clone(), on_state);
         let config = Connection::create_config();
         let raw_peer = RtcPeerConnection::new_with_configuration(&config).unwrap();
-        raw_peer.set_oniceconnectionstatechange(on_state_change.as_ref().dyn_ref());
+        // raw_peer.set_oniceconnectionstatechange(on_state_change.as_ref().dyn_ref());
         let peer: Rc<RtcPeerConnection> = Rc::new(raw_peer);
         Connection {
             video,
