@@ -74,8 +74,8 @@ impl Connection {
                     console::error_1(&event);
                     panic!("Invalid string");
                 }
-                Some(state) if state == "failed" || state == "disconnected" ||
-                    state == "closed" => {
+                Some(state) if state == "failed" || state == "closed" => {
+                    console::log_1(&JsValue::from_str("in"));
                     let video: &HtmlVideoElement = video_rc.as_ref();
                     video.parent_node().unwrap().remove_child(&video).unwrap();
                     (on_state)();
