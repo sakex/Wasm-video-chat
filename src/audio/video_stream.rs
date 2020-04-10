@@ -18,12 +18,12 @@ pub struct VideoConstraints {
 
 #[derive(Serialize)]
 pub struct StunServer {
-    url: &'static str,
+    urls: Vec<&'static str>,
 }
 
 #[derive(Serialize)]
 pub struct TurnServer {
-    url: &'static str,
+    urls: Vec<&'static str>,
     credential: &'static str,
     username: &'static str,
 }
@@ -45,7 +45,7 @@ struct Connection {
     peer: Rc<RtcPeerConnection>,
     on_ice_candidate: js_sys::Function,
     video: Rc<web_sys::HtmlVideoElement>,
-    on_state_change: Closure<dyn FnMut(JsValue)>
+    on_state_change: Closure<dyn FnMut(JsValue)>,
 }
 
 impl Connection {
@@ -53,10 +53,10 @@ impl Connection {
         let mut config = RtcConfiguration::new();
         let arr = js_sys::Array::new();
         let stun = StunServer {
-            url: "stun:stun.l.google.com:19302"
+            urls: vec!["stun:stun.l.google.com:19302"]
         };
         let turn = TurnServer {
-            url: "turn:numb.viagenie.ca",
+            urls: vec!["turn:numb.viagenie.ca"],
             credential: "muazkh",
             username: "webrtc@live.com",
         };
@@ -74,7 +74,7 @@ impl Connection {
                     console::error_1(&event);
                     panic!("Invalid string");
                 }
-                Some(state) if state == "failed" || state == "closed" => {
+                Some(state) if state == "failed" || state == "disconnected" || state == "closed" => {
                     console::log_1(&JsValue::from_str("in"));
                     let video: &HtmlVideoElement = video_rc.as_ref();
                     video.parent_node().unwrap().remove_child(&video).unwrap();
@@ -96,7 +96,7 @@ impl Connection {
             video,
             peer,
             on_ice_candidate: js_sys::Function::new_no_args(""),
-            on_state_change
+            on_state_change,
         }
     }
 
