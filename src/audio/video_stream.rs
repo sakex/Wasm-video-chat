@@ -6,6 +6,7 @@ use crate::js_extend::ConnectionOffer;
 use crate::{get, js_await};
 use std::rc::Rc;
 use wasm_bindgen::__rt::std::collections::HashMap;
+use wasm_bindgen::__rt::WasmRefCell;
 
 #[derive(Serialize)]
 pub struct VideoConstraints {
@@ -43,7 +44,7 @@ fn create_video(muted: bool) -> Result<Rc<web_sys::HtmlVideoElement>, JsValue> {
 struct Connection {
     peer: Rc<RtcPeerConnection>,
     on_ice_candidate: js_sys::Function,
-    video: Rc<web_sys::HtmlVideoElement>,
+    video: Rc<web_sys::HtmlVideoElement>
 }
 
 impl Connection {
@@ -64,17 +65,40 @@ impl Connection {
         config
     }
 
-    pub fn new() -> Connection {
+    fn state_change_cb(&self, on_state: Box<dyn Fn()>) -> Closure<dyn FnMut(JsValue)> {
+        let video_rc = Rc::clone(&self.video);
+        Closure::wrap(Box::new(move |event: JsValue| {
+            let js_state = get![event => "iceConnectionState"];
+            match js_state.as_string() {
+                None => {
+                    console::error_1(&event);
+                    panic!("Invalid string");
+                }
+                Some(state) if state == "failed" || state == "disconnected" ||
+                    state == "closed" => {
+                    let video: &HtmlVideoElement = video_rc.as_ref();
+                    video.parent_node().unwrap().remove_child(&video).unwrap();
+                    (on_state)();
+                }
+                Some(_) => {}
+            }
+        }) as Box<dyn FnMut(JsValue)>)
+    }
+
+    pub fn new(on_state: Box<dyn Fn()>) -> Connection {
         let video = create_video(false).unwrap();
         let config = Connection::create_config();
-        let peer: Rc<RtcPeerConnection> = Rc::new(
-            RtcPeerConnection::new_with_configuration(&config).unwrap()
-        );
-        Connection {
+        let raw_peer = RtcPeerConnection::new_with_configuration(&config).unwrap();
+        let peer: Rc<RtcPeerConnection> = Rc::new(raw_peer);
+        let co = Connection {
             video,
             peer,
             on_ice_candidate: js_sys::Function::new_no_args(""),
-        }
+        };
+        let on_state = co.state_change_cb(on_state);
+        co.peer.as_ref().set_oniceconnectionstatechange(on_state.as_ref().dyn_ref());
+
+        co
     }
 
     pub fn create_offer(&self, stream: &MediaStream) -> ConnectionOffer {
@@ -198,12 +222,15 @@ impl Connection {
     }
 }
 
+type ConnectionDict = Rc<WasmRefCell<HashMap<String, Connection>>>;
+
 #[wasm_bindgen]
 pub struct Streaming {
     dom_element: web_sys::Element,
     self_video: Rc<web_sys::HtmlVideoElement>,
-    connections: HashMap<String, Connection>,
+    connections: ConnectionDict,
 }
+
 
 #[wasm_bindgen]
 impl Streaming {
@@ -213,30 +240,30 @@ impl Streaming {
         Streaming {
             dom_element,
             self_video: video,
-            connections: HashMap::new(),
+            connections: Rc::new(WasmRefCell::new(HashMap::new())),
         }
     }
 
     pub fn set_on_ice_candidate(&mut self, id: String, closure: js_sys::Function) {
-        match self.connections.get_mut(&id) {
+        match self.connections.borrow_mut().get_mut(&id) {
             Some(connection) => { connection.set_on_ice_candidate(closure); }
             None => panic!("Id {} does not exist", &id)
         }
     }
 
     pub fn add_ice_candidate(&mut self, id: String, candidate: RtcIceCandidate) -> js_sys::Promise {
-        match self.connections.get_mut(&id) {
+        match self.connections.borrow_mut().get_mut(&id) {
             Some(connection) => { connection.add_ice_candidate(candidate) }
             None => panic!("Id {} does not exist", &id)
         }
     }
 
-    pub fn create_offer(&self, id: String) -> ConnectionOffer {
+    pub fn create_offer(&mut self, id: String) -> ConnectionOffer {
         let stream = match self.self_video.as_ref().src_object() {
             Some(s) => s,
             None => panic!("Stream not set")
         };
-        match self.connections.get(&id) {
+        match self.connections.borrow().get(&id) {
             Some(connection) => { connection.create_offer(&stream) }
             None => panic!("Id {} does not exist", &id)
         }
@@ -247,25 +274,25 @@ impl Streaming {
             Some(s) => s,
             None => panic!("Stream not set")
         };
-        match self.connections.get_mut(&id) {
+        match self.connections.borrow_mut().get_mut(&id) {
             Some(connection) => { connection.accept_offer(offer, &stream) }
             None => panic!("Id {} does not exist", &id)
         }
     }
 
+
     pub fn accept_answer(&mut self, id: String, answer: RtcSessionDescriptionInit) -> ConnectionOffer {
-        match self.connections.get_mut(&id) {
+        match self.connections.borrow_mut().get_mut(&id) {
             Some(connection) => { connection.accept_answer(answer) }
             None => panic!("Id {} does not exist", &id)
         }
     }
 
-    pub fn load_video(&self) -> js_sys::Promise {
+    pub fn load_video(&mut self) -> js_sys::Promise {
         let devices = web_sys::window().unwrap().navigator().media_devices().unwrap();
         let mut constraints = MediaStreamConstraints::new();
         constraints.audio(&JsValue::TRUE);
         let video_constraints = VideoConstraints { width: 300, height: 300, frame_rate: 10 };
-        // constraints.video(&JsValue::from_serde(&video_constraints).unwrap());
         constraints.video(&JsValue::TRUE);
         let promise = devices.get_user_media_with_constraints(&constraints).unwrap();
         let video = Rc::clone(&self.self_video);
@@ -286,19 +313,28 @@ impl Streaming {
         })
     }
 
+    fn on_state(&mut self, id: String) -> Box<dyn Fn()> {
+        let rc = self.connections.clone();
+        Box::new(move || {
+            let connections = &*rc;
+            connections.borrow_mut().remove(&id);
+        })
+    }
+
     pub fn create_connection(&mut self, id: String) -> Result<JsValue, JsValue> {
-        if !self.connections.contains_key(&id) {
-            let co = Connection::new();
+        if !self.connections.borrow().contains_key(&id) {
+            let co = Connection::new(self.on_state(id.clone()));
             self.dom_element.append_child(&co.video).unwrap();
-            self.connections.insert(id, co);
-            return Ok(JsValue::TRUE)
+            self.connections.borrow_mut().insert(id, co);
+            return Ok(JsValue::TRUE);
         }
         Err(JsValue::from_str("Id already created"))
     }
 
-    pub fn get_ids(&self) -> js_sys::Set {
+
+    pub fn get_ids(&mut self) -> js_sys::Set {
         let set: js_sys::Set = js_sys::Set::new(&JsValue::UNDEFINED);
-        for key in self.connections.keys() {
+        for key in self.connections.borrow_mut().keys() {
             set.add(&JsValue::from_str(key));
         }
         set
