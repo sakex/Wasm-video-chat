@@ -44,7 +44,8 @@ fn create_video(muted: bool) -> Result<Rc<web_sys::HtmlVideoElement>, JsValue> {
 struct Connection {
     peer: Rc<RtcPeerConnection>,
     on_ice_candidate: js_sys::Function,
-    video: Rc<web_sys::HtmlVideoElement>
+    video: Rc<web_sys::HtmlVideoElement>,
+    on_state_change: Closure<dyn FnMut(JsValue)>
 }
 
 impl Connection {
@@ -65,10 +66,9 @@ impl Connection {
         config
     }
 
-    fn state_change_cb(&self, on_state: Box<dyn Fn()>) -> Closure<dyn FnMut(JsValue)> {
-        let video_rc = Rc::clone(&self.video);
+    fn state_change_cb(video_rc: Rc<web_sys::HtmlVideoElement>, on_state: Box<dyn Fn()>) -> Closure<dyn FnMut(JsValue)> {
         Closure::wrap(Box::new(move |event: JsValue| {
-            let js_state = get![event => "iceConnectionState"];
+            let js_state = get![event => "target" => "iceConnectionState"];
             match js_state.as_string() {
                 None => {
                     console::error_1(&event);
@@ -87,18 +87,17 @@ impl Connection {
 
     pub fn new(on_state: Box<dyn Fn()>) -> Connection {
         let video = create_video(false).unwrap();
+        let on_state_change = Connection::state_change_cb(video.clone(), on_state);
         let config = Connection::create_config();
         let raw_peer = RtcPeerConnection::new_with_configuration(&config).unwrap();
+        raw_peer.set_oniceconnectionstatechange(on_state_change.as_ref().dyn_ref());
         let peer: Rc<RtcPeerConnection> = Rc::new(raw_peer);
-        let co = Connection {
+        Connection {
             video,
             peer,
             on_ice_candidate: js_sys::Function::new_no_args(""),
-        };
-        let on_state = co.state_change_cb(on_state);
-        co.peer.as_ref().set_oniceconnectionstatechange(on_state.as_ref().dyn_ref());
-
-        co
+            on_state_change
+        }
     }
 
     pub fn create_offer(&self, stream: &MediaStream) -> ConnectionOffer {

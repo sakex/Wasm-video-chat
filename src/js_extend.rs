@@ -2,7 +2,12 @@ use wasm_bindgen::prelude::*;
 
 #[macro_export]
 macro_rules! get {
-    ($obj: ident => $key: expr) => (js_sys::Reflect::get(&$obj, &JsValue::from_str($key)).unwrap())
+    ($obj: expr => $key: tt) => (js_sys::Reflect::get(&$obj, &JsValue::from_str($key)).unwrap());
+    ($obj: ident  => $key0: tt => $($key: tt)+) => {{
+        let mut ret = get![$obj => $key0];
+        ret = $(get![ret => $key];)*
+        ret
+    }};
 }
 
 #[macro_export]
