@@ -18,12 +18,12 @@ pub struct VideoConstraints {
 
 #[derive(Serialize)]
 pub struct StunServer {
-    urls: Vec<&'static str>,
+    url: Vec<&'static str>,
 }
 
 #[derive(Serialize)]
 pub struct TurnServer {
-    urls: Vec<&'static str>,
+    url: Vec<&'static str>,
     credential: &'static str,
     username: &'static str,
 }
@@ -53,10 +53,10 @@ impl Connection {
         let mut config = RtcConfiguration::new();
         let arr = js_sys::Array::new();
         let stun = StunServer {
-            urls: vec!["stun:stun.l.google.com:19302"]
+            url: "stun:stun.l.google.com:19302"
         };
         let turn = TurnServer {
-            urls: vec!["turn:numb.viagenie.ca"],
+            url: "turn:numb.viagenie.ca",
             credential: "muazkh",
             username: "webrtc@live.com",
         };
@@ -90,7 +90,7 @@ impl Connection {
         let on_state_change = Connection::state_change_cb(video.clone(), on_state);
         let config = Connection::create_config();
         let raw_peer = RtcPeerConnection::new_with_configuration(&config).unwrap();
-        // raw_peer.set_oniceconnectionstatechange(on_state_change.as_ref().dyn_ref());
+        raw_peer.set_oniceconnectionstatechange(on_state_change.as_ref().dyn_ref());
         let peer: Rc<RtcPeerConnection> = Rc::new(raw_peer);
         Connection {
             video,
