@@ -32,7 +32,7 @@ fn create_video(muted: bool) -> Result<Rc<web_sys::HtmlVideoElement>, JsValue> {
     let document = web_sys::window().unwrap().document().unwrap();
     let video = document.create_element("video").unwrap().unchecked_into::<web_sys::HtmlVideoElement>();
     video.set_autoplay(true);
-    video.set_attribute("playsinline", "true");
+    video.set_attribute("playsinline", "true").unwrap();
     video.set_muted(muted);
     video.set_width(300);
     video.set_height(300);
