@@ -18,12 +18,12 @@ pub struct VideoConstraints {
 
 #[derive(Serialize)]
 pub struct StunServer {
-    url: Vec<&'static str>,
+    url: &'static str,
 }
 
 #[derive(Serialize)]
 pub struct TurnServer {
-    url: Vec<&'static str>,
+    url: &'static str,
     credential: &'static str,
     username: &'static str,
 }
