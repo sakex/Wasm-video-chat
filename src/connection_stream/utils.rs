@@ -3,7 +3,6 @@ use std::rc::Rc;
 use wasm_bindgen::prelude::{JsValue, Closure};
 use wasm_bindgen::JsCast;
 use std::cell::RefCell;
-use crate::{get};
 
 
 pub fn create_video(muted: bool) -> Result<(Rc<HtmlVideoElement>, Rc<HtmlCanvasElement>), JsValue> {

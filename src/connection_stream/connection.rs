@@ -3,7 +3,7 @@ use web_sys::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::future_to_promise;
 use crate::js_extend::ConnectionOffer;
-use crate::{js_await};
+use crate::{js_await, get};
 use std::rc::Rc;
 use crate::connection_stream::utils::{create_video, draw_video};
 
