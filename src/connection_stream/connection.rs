@@ -3,7 +3,7 @@ use web_sys::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::future_to_promise;
 use crate::js_extend::ConnectionOffer;
-use crate::{get, js_await};
+use crate::{js_await};
 use std::rc::Rc;
 use crate::connection_stream::utils::{create_video, draw_video};
 
@@ -49,7 +49,7 @@ impl Connection {
         config
     }
 
-    fn state_change_cb(canvas_rc: Rc<web_sys::HtmlVideoElement>, on_state: Box<dyn Fn()>) -> Closure<dyn FnMut(JsValue)> {
+    fn state_change_cb(canvas_rc: Rc<web_sys::HtmlCanvasElement>, on_state: Box<dyn Fn()>) -> Closure<dyn FnMut(JsValue)> {
         Closure::wrap(Box::new(move |event: JsValue| {
             let js_state = get![event => "target" => "iceConnectionState"];
             match js_state.as_string() {
@@ -59,8 +59,9 @@ impl Connection {
                 }
                 Some(state) if state == "failed" || state == "disconnected" || state == "closed" => {
                     console::log_1(&JsValue::from_str("in"));
-                    let canvas: &HtmlVideoElement = canvas_rc.as_ref();
-                    canvas.parent_node().unwrap().remove_child(&canvas).unwrap();
+                    let canvas: &HtmlCanvasElement = canvas_rc.as_ref();
+                    let parent = canvas.parent_element().unwrap();
+                    parent.remove_child(&canvas).unwrap();
                     (on_state)();
                 }
                 Some(_) => {}
@@ -70,7 +71,7 @@ impl Connection {
 
     pub fn new(on_state: Box<dyn Fn()>) -> Connection {
         let (video, canvas) = create_video(false).unwrap();
-        let on_state_change = Connection::state_change_cb(video.clone(), on_state);
+        let on_state_change = Connection::state_change_cb(canvas.clone(), on_state);
         let config = Connection::create_config();
         let raw_peer = RtcPeerConnection::new_with_configuration(&config).unwrap();
         raw_peer.set_oniceconnectionstatechange(on_state_change.as_ref().dyn_ref());
