@@ -5,7 +5,8 @@ use wasm_bindgen_futures::future_to_promise;
 use crate::js_extend::ConnectionOffer;
 use crate::{js_await, get};
 use std::rc::Rc;
-use crate::connection_stream::utils::{create_video, draw_video};
+use crate::connection_stream::render_video::{create_video, VideoRenderer};
+use std::cell::RefCell;
 
 #[derive(Serialize)]
 pub struct StunServer {
@@ -23,13 +24,13 @@ pub struct Connection {
     peer: Rc<RtcPeerConnection>,
     on_ice_candidate: js_sys::Function,
     video: Rc<web_sys::HtmlVideoElement>,
-    canvas: Rc<web_sys::HtmlCanvasElement>,
-    on_state_change: Closure<dyn FnMut(JsValue)>
+    on_state_change: Closure<dyn FnMut(JsValue)>,
+    renderer: Rc<RefCell<VideoRenderer>>
 }
 
 impl Connection {
-    pub fn get_canvas(&self) -> Rc<web_sys::HtmlCanvasElement> {
-        self.canvas.clone()
+    pub fn get_video(&self) -> Rc<web_sys::HtmlVideoElement> {
+        self.video.clone()
     }
 
     fn create_config() -> RtcConfiguration {
@@ -49,7 +50,7 @@ impl Connection {
         config
     }
 
-    fn state_change_cb(canvas_rc: Rc<web_sys::HtmlCanvasElement>, on_state: Box<dyn Fn()>) -> Closure<dyn FnMut(JsValue)> {
+    fn state_change_cb(on_state: Box<dyn Fn()>) -> Closure<dyn FnMut(JsValue)> {
         Closure::wrap(Box::new(move |event: JsValue| {
             let js_state = get![event => "target" => "iceConnectionState"];
             match js_state.as_string() {
@@ -58,10 +59,6 @@ impl Connection {
                     panic!("Invalid string");
                 }
                 Some(state) if state == "failed" || state == "disconnected" || state == "closed" => {
-                    console::log_1(&JsValue::from_str("in"));
-                    let canvas: &HtmlCanvasElement = canvas_rc.as_ref();
-                    let parent = canvas.parent_element().unwrap();
-                    parent.remove_child(&canvas).unwrap();
                     (on_state)();
                 }
                 Some(_) => {}
@@ -69,19 +66,19 @@ impl Connection {
         }) as Box<dyn FnMut(JsValue)>)
     }
 
-    pub fn new(on_state: Box<dyn Fn()>) -> Connection {
-        let (video, canvas) = create_video(false).unwrap();
-        let on_state_change = Connection::state_change_cb(canvas.clone(), on_state);
+    pub fn new(renderer: Rc<RefCell<VideoRenderer>>, on_state: Box<dyn Fn()>) -> Connection {
+        let video = create_video(false).unwrap();
+        let on_state_change = Connection::state_change_cb(on_state);
         let config = Connection::create_config();
         let raw_peer = RtcPeerConnection::new_with_configuration(&config).unwrap();
         raw_peer.set_oniceconnectionstatechange(on_state_change.as_ref().dyn_ref());
         let peer: Rc<RtcPeerConnection> = Rc::new(raw_peer);
         Connection {
             video,
-            canvas,
             peer,
             on_ice_candidate: js_sys::Function::new_no_args(""),
-            on_state_change
+            on_state_change,
+            renderer
         }
     }
 
@@ -183,7 +180,7 @@ impl Connection {
 
     fn track_cb(&self) -> Closure<dyn FnMut(JsValue)> {
         let video_rc = Rc::clone(&self.video);
-        let canvas_rc = Rc::clone(&self.canvas);
+        let renderer = self.renderer.clone();
         Closure::wrap(Box::new(move |event: JsValue| {
             match video_rc.as_ref().src_object() {
                 Some(_src) => {}
@@ -193,7 +190,7 @@ impl Connection {
                     let stream: MediaStream = js_stream.unchecked_into();
                     video_rc.set_src_object(Some(&stream));
                     let _ = video_rc.play().unwrap();
-                    draw_video(video_rc.clone(), canvas_rc.clone()).unwrap();
+                    renderer.borrow_mut().add_video(video_rc.clone());
                 }
             }
         }) as Box<dyn FnMut(JsValue)>)

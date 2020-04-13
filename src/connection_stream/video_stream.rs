@@ -9,7 +9,8 @@ use wasm_bindgen::__rt::std::collections::HashMap;
 use wasm_bindgen::__rt::WasmRefCell;
 
 use crate::connection_stream::connection::Connection;
-use crate::connection_stream::utils::{create_video, draw_video};
+use crate::connection_stream::render_video::{create_video, VideoRenderer};
+use wasm_bindgen::__rt::core::cell::{RefCell};
 
 #[derive(Serialize)]
 pub struct VideoConstraints {
@@ -25,8 +26,9 @@ type ConnectionDict = Rc<WasmRefCell<HashMap<String, Connection>>>;
 pub struct Streaming {
     dom_element: web_sys::Element,
     self_video: Rc<web_sys::HtmlVideoElement>,
-    self_canvas: Rc<web_sys::HtmlCanvasElement>,
+    canvas: Rc<web_sys::HtmlCanvasElement>,
     connections: ConnectionDict,
+    renderer: Rc<RefCell<VideoRenderer>>
 }
 
 
@@ -34,12 +36,18 @@ pub struct Streaming {
 impl Streaming {
     #[wasm_bindgen(constructor)]
     pub fn new(dom_element: web_sys::Element) -> Streaming {
-        let (video, canvas) = create_video(true).unwrap();
+        let video = create_video(true).unwrap();
+        let document = web_sys::window().unwrap().document().unwrap();
+        let canvas = document.create_element("canvas").unwrap().unchecked_into::<HtmlCanvasElement>();
+        canvas.set_width(1280);
+        canvas.set_height(720);
+        let canvas_rc = Rc::new(canvas);
         Streaming {
             dom_element,
             self_video: video,
-            self_canvas: canvas,
+            canvas: canvas_rc.clone(),
             connections: Rc::new(WasmRefCell::new(HashMap::new())),
+            renderer: Rc::new(RefCell::new(VideoRenderer::new(canvas_rc).unwrap()))
         }
     }
 
@@ -88,19 +96,22 @@ impl Streaming {
         }
     }
 
-    pub fn load_video(&mut self) -> js_sys::Promise {
-        let devices = web_sys::window().unwrap().navigator().media_devices().unwrap();
+    pub fn load_video(&mut self) -> Result<js_sys::Promise, JsValue> {
+        let devices = web_sys::window().unwrap().navigator().media_devices()?;
         let mut constraints = MediaStreamConstraints::new();
         constraints.audio(&JsValue::TRUE);
         let _video_constraints = VideoConstraints { width: 300, height: 300, frame_rate: 10 };
         constraints.video(&JsValue::TRUE);
-        let promise = devices.get_user_media_with_constraints(&constraints).unwrap();
+        let promise = devices.get_user_media_with_constraints(&constraints)?;
         let video = self.self_video.clone();
-        let canvas = self.self_canvas.clone();
+        let canvas = self.canvas.clone();
 
-        self.dom_element.append_child(&canvas).unwrap();
+        let mut renderer = self.renderer.borrow_mut();
+        self.dom_element.append_child(&canvas)?;
+        renderer.add_video(video.clone());
+        renderer.start()?;
 
-        future_to_promise(async move {
+        Ok(future_to_promise(async move {
             let js_stream: JsValue = match js_await![promise] {
                 Ok(val) => val,
                 Err(e) => panic!("{:?}", e)
@@ -109,26 +120,27 @@ impl Streaming {
                 Ok(stream) => {
                     video.set_src_object(Some(&stream));
                     let _p = video.play().unwrap();
-                    draw_video(video, canvas).unwrap();
                     Ok(stream.unchecked_into())
                 }
                 Err(e) => Err(e)
             }
-        })
+        }))
     }
 
     fn on_state(&mut self, id: String) -> Box<dyn Fn()> {
         let rc = self.connections.clone();
+        let renderer = self.renderer.clone();
         Box::new(move || {
             let connections = &*rc;
-            connections.borrow_mut().remove(&id);
+            if let Some(connection) = connections.borrow_mut().remove(&id) {
+                renderer.borrow_mut().remove_video(&connection.get_video());
+            }
         })
     }
 
     pub fn create_connection(&mut self, id: String) -> Result<JsValue, JsValue> {
         if !self.connections.borrow().contains_key(&id) {
-            let co = Connection::new(self.on_state(id.clone()));
-            self.dom_element.append_child(&co.get_canvas()).unwrap();
+            let co = Connection::new(self.renderer.clone(), self.on_state(id.clone()));
             self.connections.borrow_mut().insert(id, co);
             return Ok(JsValue::TRUE);
         }
