@@ -132,7 +132,7 @@ impl Streaming {
         let renderer = self.renderer.clone();
         Box::new(move || {
             let connections = &*rc;
-            if let Some(connection) = connections.borrow_mut().remove(&id) {
+            if let Some(_connection) = connections.borrow_mut().remove(&id) {
                 renderer.borrow_mut().remove_video(&id);
             }
         })
@@ -140,7 +140,7 @@ impl Streaming {
 
     pub fn create_connection(&mut self, id: String) -> Result<JsValue, JsValue> {
         if !self.connections.borrow().contains_key(&id) {
-            let co = Connection::new(id.clone(), self.renderer.clone(), self.on_state(id.clone()));
+            let co = Connection::new(id.clone(), &mut *self.renderer.clone().borrow_mut(), self.on_state(id.clone()));
             self.connections.borrow_mut().insert(id, co);
             return Ok(JsValue::TRUE);
         }
@@ -162,5 +162,9 @@ impl Streaming {
 
     pub fn set_video_pos(&mut self, id: String, x: f64, y: f64) -> Result<JsValue, JsValue> {
         self.renderer.borrow_mut().set_video_pos(id, x, y)
+    }
+
+    pub fn set_dims(&mut self, x: f64, y: f64) {
+        self.renderer.borrow_mut().set_dims(x, y);
     }
 }

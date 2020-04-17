@@ -6,7 +6,6 @@ use crate::js_extend::ConnectionOffer;
 use crate::{js_await, get};
 use std::rc::Rc;
 use crate::connection_stream::render_video::{create_video, VideoRenderer};
-use std::cell::RefCell;
 
 #[derive(Serialize)]
 pub struct StunServer {
@@ -24,16 +23,10 @@ pub struct Connection {
     peer: Rc<RtcPeerConnection>,
     on_ice_candidate: js_sys::Function,
     video: Rc<web_sys::HtmlVideoElement>,
-    on_state_change: Closure<dyn FnMut(JsValue)>,
-    renderer: Rc<RefCell<VideoRenderer>>,
-    id: String
+    _on_state_change: Closure<dyn FnMut(JsValue)>
 }
 
 impl Connection {
-    pub fn get_video(&self) -> Rc<web_sys::HtmlVideoElement> {
-        self.video.clone()
-    }
-
     fn create_config() -> RtcConfiguration {
         let mut config = RtcConfiguration::new();
         let arr = js_sys::Array::new();
@@ -67,20 +60,19 @@ impl Connection {
         }) as Box<dyn FnMut(JsValue)>)
     }
 
-    pub fn new(id: String, renderer: Rc<RefCell<VideoRenderer>>, on_state: Box<dyn Fn()>) -> Connection {
+    pub fn new(id: String, renderer: &mut VideoRenderer, on_state: Box<dyn Fn()>) -> Connection {
         let video = create_video(false).unwrap();
-        let on_state_change = Connection::state_change_cb(on_state);
+        renderer.add_video(id.as_str().into(), video.clone());
+        let _on_state_change = Connection::state_change_cb(on_state);
         let config = Connection::create_config();
         let raw_peer = RtcPeerConnection::new_with_configuration(&config).unwrap();
-        raw_peer.set_oniceconnectionstatechange(on_state_change.as_ref().dyn_ref());
+        raw_peer.set_oniceconnectionstatechange(_on_state_change.as_ref().dyn_ref());
         let peer: Rc<RtcPeerConnection> = Rc::new(raw_peer);
         Connection {
             video,
             peer,
             on_ice_candidate: js_sys::Function::new_no_args(""),
-            on_state_change,
-            renderer,
-            id
+            _on_state_change
         }
     }
 
@@ -182,8 +174,6 @@ impl Connection {
 
     fn track_cb(&self) -> Closure<dyn FnMut(JsValue)> {
         let video_rc = Rc::clone(&self.video);
-        let renderer = self.renderer.clone();
-        let id = Box::new(self.id.clone());
         Closure::wrap(Box::new(move |event: JsValue| {
             match video_rc.as_ref().src_object() {
                 Some(_src) => {}
@@ -193,7 +183,6 @@ impl Connection {
                     let stream: MediaStream = js_stream.unchecked_into();
                     video_rc.set_src_object(Some(&stream));
                     let _ = video_rc.play().unwrap();
-                    renderer.borrow_mut().add_video(id.as_str().into(), video_rc.clone());
                 }
             }
         }) as Box<dyn FnMut(JsValue)>)

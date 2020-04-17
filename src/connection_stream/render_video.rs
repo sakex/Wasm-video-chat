@@ -52,10 +52,10 @@ impl VideoRenderer {
         })
     }
 
-    pub fn set_dims(&mut self, new_dims: (f64, f64)) {
+    pub fn set_dims(&mut self, x: f64, y:f64) {
         let mut dims = self.dims.borrow_mut();
-        dims.0 = new_dims.0;
-        dims.1 = new_dims.1;
+        dims.0 = x;
+        dims.1 = y;
     }
 
     pub fn set_video_pos(&mut self, id: String, x: f64, y: f64) -> Result<JsValue, JsValue> {
