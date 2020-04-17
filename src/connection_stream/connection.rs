@@ -25,7 +25,8 @@ pub struct Connection {
     on_ice_candidate: js_sys::Function,
     video: Rc<web_sys::HtmlVideoElement>,
     on_state_change: Closure<dyn FnMut(JsValue)>,
-    renderer: Rc<RefCell<VideoRenderer>>
+    renderer: Rc<RefCell<VideoRenderer>>,
+    id: String
 }
 
 impl Connection {
@@ -66,7 +67,7 @@ impl Connection {
         }) as Box<dyn FnMut(JsValue)>)
     }
 
-    pub fn new(renderer: Rc<RefCell<VideoRenderer>>, on_state: Box<dyn Fn()>) -> Connection {
+    pub fn new(id: String, renderer: Rc<RefCell<VideoRenderer>>, on_state: Box<dyn Fn()>) -> Connection {
         let video = create_video(false).unwrap();
         let on_state_change = Connection::state_change_cb(on_state);
         let config = Connection::create_config();
@@ -78,7 +79,8 @@ impl Connection {
             peer,
             on_ice_candidate: js_sys::Function::new_no_args(""),
             on_state_change,
-            renderer
+            renderer,
+            id
         }
     }
 
@@ -181,6 +183,7 @@ impl Connection {
     fn track_cb(&self) -> Closure<dyn FnMut(JsValue)> {
         let video_rc = Rc::clone(&self.video);
         let renderer = self.renderer.clone();
+        let id = Box::new(self.id.clone());
         Closure::wrap(Box::new(move |event: JsValue| {
             match video_rc.as_ref().src_object() {
                 Some(_src) => {}
@@ -190,7 +193,7 @@ impl Connection {
                     let stream: MediaStream = js_stream.unchecked_into();
                     video_rc.set_src_object(Some(&stream));
                     let _ = video_rc.play().unwrap();
-                    renderer.borrow_mut().add_video(video_rc.clone());
+                    renderer.borrow_mut().add_video(id.as_str().into(), video_rc.clone());
                 }
             }
         }) as Box<dyn FnMut(JsValue)>)

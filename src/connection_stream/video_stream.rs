@@ -3,14 +3,14 @@ use web_sys::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::future_to_promise;
 use crate::js_extend::ConnectionOffer;
-use crate::{js_await};
+use crate::js_await;
 use std::rc::Rc;
 use wasm_bindgen::__rt::std::collections::HashMap;
 use wasm_bindgen::__rt::WasmRefCell;
 
 use crate::connection_stream::connection::Connection;
 use crate::connection_stream::render_video::{create_video, VideoRenderer};
-use wasm_bindgen::__rt::core::cell::{RefCell};
+use wasm_bindgen::__rt::core::cell::RefCell;
 
 #[derive(Serialize)]
 pub struct VideoConstraints {
@@ -28,7 +28,7 @@ pub struct Streaming {
     self_video: Rc<web_sys::HtmlVideoElement>,
     canvas: Rc<web_sys::HtmlCanvasElement>,
     connections: ConnectionDict,
-    renderer: Rc<RefCell<VideoRenderer>>
+    renderer: Rc<RefCell<VideoRenderer>>,
 }
 
 
@@ -39,15 +39,15 @@ impl Streaming {
         let video = create_video(true).unwrap();
         let document = web_sys::window().unwrap().document().unwrap();
         let canvas = document.create_element("canvas").unwrap().unchecked_into::<HtmlCanvasElement>();
-        canvas.set_width(1280);
-        canvas.set_height(720);
+        canvas.set_width(1100);
+        canvas.set_height(726);
         let canvas_rc = Rc::new(canvas);
         Streaming {
             dom_element,
             self_video: video,
             canvas: canvas_rc.clone(),
             connections: Rc::new(WasmRefCell::new(HashMap::new())),
-            renderer: Rc::new(RefCell::new(VideoRenderer::new(canvas_rc).unwrap()))
+            renderer: Rc::new(RefCell::new(VideoRenderer::new(canvas_rc).unwrap())),
         }
     }
 
@@ -108,7 +108,7 @@ impl Streaming {
 
         let mut renderer = self.renderer.borrow_mut();
         self.dom_element.append_child(&canvas)?;
-        renderer.add_video(video.clone());
+        renderer.add_video("self".to_string(), video.clone());
         renderer.start()?;
 
         Ok(future_to_promise(async move {
@@ -133,14 +133,14 @@ impl Streaming {
         Box::new(move || {
             let connections = &*rc;
             if let Some(connection) = connections.borrow_mut().remove(&id) {
-                renderer.borrow_mut().remove_video(&connection.get_video());
+                renderer.borrow_mut().remove_video(&id);
             }
         })
     }
 
     pub fn create_connection(&mut self, id: String) -> Result<JsValue, JsValue> {
         if !self.connections.borrow().contains_key(&id) {
-            let co = Connection::new(self.renderer.clone(), self.on_state(id.clone()));
+            let co = Connection::new(id.clone(), self.renderer.clone(), self.on_state(id.clone()));
             self.connections.borrow_mut().insert(id, co);
             return Ok(JsValue::TRUE);
         }
@@ -154,5 +154,13 @@ impl Streaming {
             set.add(&JsValue::from_str(key));
         }
         set
+    }
+
+    pub fn not_managed(&mut self) {
+        self.renderer.borrow_mut().not_managed();
+    }
+
+    pub fn set_video_pos(&mut self, id: String, x: f64, y: f64) -> Result<JsValue, JsValue> {
+        self.renderer.borrow_mut().set_video_pos(id, x, y)
     }
 }
