@@ -24,7 +24,7 @@ type ConnectionDict = Rc<WasmRefCell<HashMap<String, Connection>>>;
 
 #[wasm_bindgen]
 pub struct Streaming {
-    dom_element: web_sys::Element,
+    dom_element: web_sys::HtmlElement,
     self_video: Rc<web_sys::HtmlVideoElement>,
     canvas: Rc<web_sys::HtmlCanvasElement>,
     connections: ConnectionDict,
@@ -35,20 +35,21 @@ pub struct Streaming {
 #[wasm_bindgen]
 impl Streaming {
     #[wasm_bindgen(constructor)]
-    pub fn new(dom_element: web_sys::Element) -> Streaming {
-        let video = create_video(true).unwrap();
+    pub fn new(dom_element: web_sys::HtmlElement) -> Result<Streaming, JsValue> {
+        let video = create_video(true)?;
         let document = web_sys::window().unwrap().document().unwrap();
-        let canvas = document.create_element("canvas").unwrap().unchecked_into::<HtmlCanvasElement>();
-        canvas.set_width(1100);
-        canvas.set_height(726);
+        let canvas = document.create_element("canvas")?.unchecked_into::<HtmlCanvasElement>();
+        canvas.set_width(dom_element.offset_width() as u32);
+        canvas.set_height(dom_element.offset_height() as u32);
         let canvas_rc = Rc::new(canvas);
-        Streaming {
+        let renderer = VideoRenderer::new(canvas_rc.clone())?;
+        Ok(Streaming {
             dom_element,
             self_video: video,
-            canvas: canvas_rc.clone(),
+            canvas: canvas_rc,
             connections: Rc::new(WasmRefCell::new(HashMap::new())),
-            renderer: Rc::new(RefCell::new(VideoRenderer::new(canvas_rc).unwrap())),
-        }
+            renderer: Rc::new(RefCell::new(renderer)),
+        })
     }
 
     pub fn set_on_ice_candidate(&mut self, id: String, closure: js_sys::Function) {
@@ -65,34 +66,34 @@ impl Streaming {
         }
     }
 
-    pub fn create_offer(&mut self, id: String) -> ConnectionOffer {
+    pub fn create_offer(&mut self, id: String) -> Result<ConnectionOffer, JsValue> {
         //let stream = match get_canvas_stream(self.self_canvas.clone(), 20.0) {
         let stream = match self.self_video.as_ref().src_object() {
             Some(s) => s,
             None => panic!("Stream not set")
         };
         match self.connections.borrow().get(&id) {
-            Some(connection) => { connection.create_offer(&stream) }
-            None => panic!("Id {} does not exist", &id)
+            Some(connection) => { Ok(connection.create_offer(&stream)) }
+            None => Err(format!("Id {} does not exist", &id).into())
         }
     }
 
-    pub fn accept_offer(&mut self, id: String, offer: RtcSessionDescriptionInit) -> ConnectionOffer {
+    pub fn accept_offer(&mut self, id: String, offer: RtcSessionDescriptionInit) -> Result<ConnectionOffer, JsValue> {
         let stream = match self.self_video.as_ref().src_object() {
             Some(s) => s,
             None => panic!("Stream not set")
         };
         match self.connections.borrow_mut().get_mut(&id) {
-            Some(connection) => { connection.accept_offer(offer, &stream) }
-            None => panic!("Id {} does not exist", &id)
+            Some(connection) => { Ok(connection.accept_offer(offer, &stream)) }
+            None => Err(format!("Id {} does not exist", &id).into())
         }
     }
 
 
-    pub fn accept_answer(&mut self, id: String, answer: RtcSessionDescriptionInit) -> ConnectionOffer {
+    pub fn accept_answer(&mut self, id: String, answer: RtcSessionDescriptionInit) -> Result<ConnectionOffer, JsValue> {
         match self.connections.borrow_mut().get_mut(&id) {
-            Some(connection) => { connection.accept_answer(answer) }
-            None => panic!("Id {} does not exist", &id)
+            Some(connection) => { Ok(connection.accept_answer(answer)) }
+            None => Err(format!("Id {} does not exist", &id).into())
         }
     }
 
