@@ -39,10 +39,12 @@ impl Streaming {
         let video = create_video(true)?;
         let document = web_sys::window().unwrap().document().unwrap();
         let canvas = document.create_element("canvas")?.unchecked_into::<HtmlCanvasElement>();
-        canvas.set_width(dom_element.offset_width() as u32);
-        canvas.set_height(dom_element.offset_height() as u32);
+        let width = dom_element.offset_width();
+        let height = dom_element.offset_height();
+        canvas.set_width(width as u32);
+        canvas.set_height(height as u32);
         let canvas_rc = Rc::new(canvas);
-        let renderer = VideoRenderer::new(canvas_rc.clone())?;
+        let renderer = VideoRenderer::new(canvas_rc.clone(), width, height)?;
         Ok(Streaming {
             dom_element,
             self_video: video,

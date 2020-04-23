@@ -33,52 +33,63 @@ pub struct VideoRenderer {
     context_rc: Rc<web_sys::CanvasRenderingContext2d>,
     videos: Rc<RefCell<HashMap<String, VideoPos>>>,
     next_pos: (f64, f64),
-    dims: RefCell<(f64, f64)>,
+    dims: Rc<RefCell<(f64, f64)>>,
     managed: bool,
     width_height: Rc<RefCell<(f64, f64)>>,
-    _on_resize: Closure<dyn FnMut()>
+    _on_resize: Closure<dyn FnMut()>,
 }
 
 impl VideoRenderer {
+    #[inline]
     fn on_resize(canvas_rc: Rc<HtmlCanvasElement>, width_height: Rc<RefCell<(f64, f64)>>) -> Closure<dyn FnMut()> {
         let mut wh = *width_height.borrow_mut();
-        Closure::wrap(Box::new(move || {
+        let cv2 = canvas_rc.clone();
+        let closure = Closure::wrap(Box::new(move || {
             let new_width = canvas_rc.offset_width();
             let new_height = canvas_rc.offset_height();
             wh.0 = new_width as f64;
             wh.1 = new_height as f64;
-        }) as Box<dyn FnMut()>)
+        }) as Box<dyn FnMut()>);
+        cv2.set_onresize(closure.as_ref().dyn_ref());
+        closure
     }
 
-
-    pub fn new(canvas_rc: Rc<HtmlCanvasElement>) -> Result<VideoRenderer, JsValue> {
+    pub fn new(canvas_rc: Rc<HtmlCanvasElement>, width: i32, height: i32) -> Result<VideoRenderer, JsValue> {
         let context = canvas_rc
             .get_context("2d")?
             .unwrap()
             .dyn_into::<web_sys::CanvasRenderingContext2d>()?;
-        let width: f64 = canvas_rc.offset_width() as f64;
-        let _height: f64 = canvas_rc.offset_height() as f64;
-        let width_height = Rc::new(RefCell::new((width, _height)));
+        let f_width = width as f64;
+        let f_height = height as f64;
+        let width_height = Rc::new(RefCell::new((f_width.clone(), f_height.clone())));
         let _on_resize = VideoRenderer::on_resize(canvas_rc, width_height.clone());
         let renderer = VideoRenderer {
             context_rc: Rc::new(context),
             videos: Rc::new(RefCell::new(HashMap::new())),
             next_pos: (10.0, 10.0),
-            dims: RefCell::new((200., 200.)),
+            dims: Rc::new(RefCell::new((f_width, f_height))),
             managed: true,
             width_height,
-            _on_resize
+            _on_resize,
         };
 
         Ok(renderer)
     }
 
-    pub fn set_dims(&mut self, x: f64, y:f64) {
-        let mut dims = self.dims.borrow_mut();
-        dims.0 = x;
-        dims.1 = y;
+    #[inline]
+    pub fn clear_all(&self) {
+        let (width, height) = *self.width_height.borrow();
+        self.context_rc.clear_rect(0., 0., width, height);
     }
 
+    #[inline]
+    pub fn set_dims(&mut self, x: f64, y: f64) {
+        self.dims.borrow_mut().0 = x;
+        self.dims.borrow_mut().1 = y;
+        // console::log_1(&format!("{}, {}", f_width, f_height).into());
+    }
+
+    #[inline]
     pub fn set_video_pos(&mut self, id: String, x: f64, y: f64) -> Result<JsValue, JsValue> {
         match self.videos.borrow_mut().get_mut(&id) {
             Some(video) => {
@@ -90,15 +101,40 @@ impl VideoRenderer {
         }
     }
 
+    #[inline]
     pub fn not_managed(&mut self) {
         self.managed = false;
     }
 
+
+    fn update_count(&mut self, count: f64) {
+        let width_height = *self.width_height.borrow();
+        let possible_width = (width_height.0 - 10. * count) / count;
+        if possible_width > 210. {
+            self.set_dims(possible_width, possible_width);
+            let mut current_x: f64 = 0.;
+            let mut current_y: f64 = 0.;
+            for (_, video_pos) in &mut *self.videos.as_ref().borrow_mut() {
+                video_pos.x = current_x;
+                current_x += possible_width + 10.;
+                if current_x + self.dims.borrow().0 >= width_height.0 {
+                    current_x = 0.;
+                    current_y += width_height.1 + 10.;
+                    video_pos.y = possible_width + 10.;
+                }
+            }
+            self.next_pos = (current_x, current_y);
+            self.clear_all();
+        }
+    }
+
     fn video_pos_managed(&mut self, video_rc: Rc<HtmlVideoElement>) -> VideoPos {
-        let (x, y) = self.next_pos;
+        let count = self.videos.as_ref().borrow().len() as f64 + 1.;
+        self.update_count(count);
         let dims = *self.dims.borrow();
+        let (x, y) = self.next_pos;
         let (width, _height) = *self.width_height.borrow();
-        if x < width {
+        if x + dims.0 < width {
             self.next_pos.0 += dims.0 + 1.0;
         } else {
             self.next_pos.0 = 10.0;
@@ -119,6 +155,7 @@ impl VideoRenderer {
         }
     }
 
+    #[inline]
     pub fn add_video(&mut self, id: String, video_rc: Rc<HtmlVideoElement>) {
         let pos = match self.managed {
             true => self.video_pos_managed(video_rc),
@@ -128,29 +165,18 @@ impl VideoRenderer {
     }
 
     pub fn remove_video(&mut self, id: &String) {
-        let mut videos = self.videos.borrow_mut();
-        let vid = videos.remove(id).unwrap();
-        let (width, height) = *self.dims.borrow();
-        let (cv_width, _cv_height) = *self.width_height.borrow();
-        self.context_rc.clear_rect(vid.x, vid.y, width, height);
+        let count: f64 = {
+            let videos_rc = self.videos.clone();
+            let mut videos = videos_rc.borrow_mut();
+            let vid = videos.remove(id).unwrap();
+            let (width, height) = *self.dims.borrow();
+            self.context_rc.clear_rect(vid.x, vid.y, width, height);
+            videos.len() as f64
+        };
         if !self.managed {
             return;
         }
-        for (_id, video) in &mut *videos {
-            self.context_rc.clear_rect(video.x, video.y, width, height);
-            if video.x == 10.0 {
-                video.x = cv_width - width;
-                video.y -= height + 10.;
-            } else {
-                video.x -= width + 10.;
-            }
-        }
-        if self.next_pos.0 <= 10.0 {
-            self.next_pos.0 = cv_width - width;
-            self.next_pos.1 -= height + 10.;
-        } else {
-            self.next_pos.0 -= width;
-        }
+        self.update_count(count);
     }
 
     pub fn start(&self) -> Result<DrawCb, JsValue> {
@@ -158,11 +184,12 @@ impl VideoRenderer {
         let func_cp = func.clone();
         let videos = self.videos.clone();
         let context = self.context_rc.clone();
-        let dims = self.dims.clone();
+        let dims_rc = self.dims.clone();
         *func_cp.borrow_mut() = Some(Closure::wrap(Box::new(move || {
+            let dims = dims_rc.borrow();
             for (_, video_pos) in videos.borrow().iter() {
                 context.draw_image_with_html_video_element_and_dw_and_dh(
-                    video_pos.video_rc.as_ref(), video_pos.x, video_pos.y, dims.borrow().0, dims.borrow().1).unwrap();
+                    video_pos.video_rc.as_ref(), video_pos.x, video_pos.y, dims.0, dims.1).unwrap();
             }
             request_animation_frame(func.borrow().as_ref().unwrap());
         }) as Box<dyn FnMut()>));

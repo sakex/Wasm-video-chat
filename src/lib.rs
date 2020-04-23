@@ -15,6 +15,6 @@ use js_extend::log;
 
 #[wasm_bindgen]
 pub fn init_panic_hook() {
-    log("Using wasm video rtc version 0.0.2");
+    log("Using wasm video rtc version 0.0.3");
     console_error_panic_hook::set_once();
 }
